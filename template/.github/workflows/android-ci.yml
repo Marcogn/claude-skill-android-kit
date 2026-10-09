@@ -20,6 +20,8 @@ jobs:
       # Permissions the packaged release manifest must not declare (space separated, may be empty).
       forbidden-permissions: ''
       coverage: true
+      # Extra Gradle arguments for the release build only, e.g. -PofflineSeed (may be empty).
+      release-build-args: ''
     # If the build needs extra environment variables from secrets, pass them as KEY=VALUE lines:
     # secrets:
     #   BUILD_ENV: "API_CLIENT_ID=${{ secrets.API_CLIENT_ID }}"

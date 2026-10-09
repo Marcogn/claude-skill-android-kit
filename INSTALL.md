@@ -48,7 +48,11 @@ Collect them from the project's current workflows and build:
   secrets to rename later so the mapping can go;
 - environment variables the build reads from secrets (an old workflow passing
   `SOME_ID: ${{ secrets.SOME_ID }}` to Gradle): they go into `BUILD_ENV` in the callers that build
-  (`BUILD_ENV: "SOME_ID=${{ secrets.SOME_ID }}"`).
+  (`BUILD_ENV: "SOME_ID=${{ secrets.SOME_ID }}"`). `BUILD_ENV` is for secret values only;
+- extra Gradle arguments the old CI passed to its release build (e.g. `RELEASE_BUILD_ARGS:
+  -PofflineSeed`): `release-build-args` in the Android CI caller. If the old workflows passed Gradle
+  arguments the kit has no input for, list them and ask: the fix belongs in the kit (an issue there),
+  not in a workaround through `BUILD_ENV`.
 
 ## 3. Workflows: callers of the kit
 
@@ -99,6 +103,9 @@ and keep `coverage: true` in the Android CI caller.
   - manual Android SDK steps for cloud sessions: replace with a pointer to the hook;
   - a session protocol that sends out-of-scope findings to CLAUDE.md notes: align it (bugs and ideas
     become GitHub issues, `docs/claude.md`, "Issues");
+  - a version of the app written in prose (e.g. "App alla 1.1.2") that differs from the build's
+    `versionName`: it is stale (Release bumps the build and the CHANGELOG, not CLAUDE.md). Replace it
+    with a pointer to the build and the CHANGELOG, so it can't go stale again;
   - over ~300 lines: don't trim here; say in the PR that it is read on every turn and propose
     trimming it as a separate task.
 - The decisions file, if any: one dated entry (kit adopted or updated, version, what was adapted,

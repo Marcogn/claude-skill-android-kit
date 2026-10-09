@@ -22,6 +22,10 @@ on:
         description: Measure unit test coverage (JaCoCo) and upload the report; the app module must enable it for -Pcoverage
         type: boolean
         default: false
+      release-build-args:
+        description: Extra Gradle arguments for the release build only (e.g. -PofflineSeed); space separated, may be empty
+        type: string
+        default: ''
     secrets:
       BUILD_ENV:
         description: Optional KEY=VALUE lines exported to the build environment
@@ -40,6 +44,7 @@ env:
   JAVA_VERSION: ${{ inputs.java-version }}
   FORBIDDEN_PERMISSIONS: ${{ inputs.forbidden-permissions }}
   COVERAGE: ${{ inputs.coverage }}
+  RELEASE_BUILD_ARGS: ${{ inputs.release-build-args }}
 
 jobs:
   build-and-test:
@@ -88,7 +93,10 @@ jobs:
       # The build that ships: R8 and resource shrinking catch missing keep rules here, not on a
       # phone. Unsigned (no secrets on pull requests), so nothing to install.
       - name: Assemble release (R8)
-        run: ./gradlew ":$APP_MODULE:assembleRelease" --no-daemon --stacktrace
+        run: |
+          # RELEASE_BUILD_ARGS is a space-separated list of arguments: split on purpose.
+          # shellcheck disable=SC2086
+          ./gradlew ":$APP_MODULE:assembleRelease" $RELEASE_BUILD_ARGS --no-daemon --stacktrace
 
       # Checks the merged manifest that actually gets packaged in the release APK, so a dependency
       # bringing a forbidden permission back fails CI instead of going unnoticed.

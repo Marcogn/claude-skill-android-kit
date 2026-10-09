@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+- **Android CI: `release-build-args` input.** Extra Gradle arguments for the release build only
+  (KartLog's `-PofflineSeed`), instead of passing non-secret flags through `BUILD_ENV`. `INSTALL.md`
+  also fixes a stale app version written in a project's `CLAUDE.md`.
+
 ## [1.0.0] - 2026-10-09
 
 - **First version, extracted from PdfToolkit.** Reusable workflows (Android CI with optional
