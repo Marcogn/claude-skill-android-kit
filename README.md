@@ -24,9 +24,10 @@ secrets).
 
 ## Changing it
 
-- Workflows: a change to `.github/workflows/` reaches every project at its next run once `v1` points
-  to it (`git tag -f v1 && git push -f origin v1` after merging). A change that callers must adapt
-  to is `v2`.
+- Workflows: projects call them at `@v1`, a **branch** that marks the stable version (GitHub accepts
+  a branch, tag or SHA there). A change on `main` reaches every project at its next run once `v1` is
+  moved to it: `git push origin main:v1` (a fast-forward). A change callers must adapt to goes to a new
+  `v2` branch, and projects move to it on purpose.
 - Everything under `template/`: projects get it at their next `/android-kit`.
 - `skill/`: re-upload to claude.ai only when the launcher changes.
 - Record each change in `CHANGELOG.md`.
