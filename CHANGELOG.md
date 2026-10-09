@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+- **`architecture-reviewer` runs on Opus.** `model: opus` instead of `inherit`: phases done with
+  Sonnet get a stricter review at `/close-phase`, at the cost of some extra usage.
+
 - **Skill `new-plan`.** Plans new work as phases in the project's format: asks the decisive
   questions and which open issues to include, then proposes the plan as a draft PR "Piano: …" to
   adjust and merge; writes no code. `next-phase` treats issues the plan assigned to a phase as in
