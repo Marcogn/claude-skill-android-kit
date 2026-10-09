@@ -1,0 +1,138 @@
+# Reusable workflow: Android CI (lint, unit tests, release build with R8, forbidden-permissions
+# check on the packaged release manifest). Verification only: it produces no APK to install.
+# Called by each project's .github/workflows/android-ci.yml (template/.github/workflows/).
+name: Android CI
+
+on:
+  workflow_call:
+    inputs:
+      app-module:
+        description: Gradle module of the application
+        type: string
+        default: app
+      java-version:
+        description: JDK used by the build
+        type: string
+        default: '17'
+      forbidden-permissions:
+        description: Permissions the packaged release manifest must not declare (space separated; empty skips the check)
+        type: string
+        default: ''
+      coverage:
+        description: Measure unit test coverage (JaCoCo) and upload the report; the app module must enable it for -Pcoverage
+        type: boolean
+        default: false
+    secrets:
+      BUILD_ENV:
+        description: Optional KEY=VALUE lines exported to the build environment
+        required: false
+
+# A new push to the same branch or PR cancels the run still going for the previous one.
+concurrency:
+  group: android-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  APP_MODULE: ${{ inputs.app-module }}
+  JAVA_VERSION: ${{ inputs.java-version }}
+  FORBIDDEN_PERMISSIONS: ${{ inputs.forbidden-permissions }}
+  COVERAGE: ${{ inputs.coverage }}
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up JDK
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v4
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v6
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # Extra build-time environment for this project (e.g. an API client id), as KEY=VALUE lines
+      # in the optional BUILD_ENV secret; values stay masked in the logs.
+      - name: Export project build environment
+        env:
+          BUILD_ENV: ${{ secrets.BUILD_ENV }}
+        run: |
+          if [ -n "$BUILD_ENV" ]; then
+            printf '%s\n' "$BUILD_ENV" | grep -E '^[A-Za-z_][A-Za-z0-9_]*=' >> "$GITHUB_ENV"
+          fi
+
+      - name: Lint
+        run: ./gradlew ":$APP_MODULE:lintDebug" --no-daemon --stacktrace
+
+      - name: Unit tests
+        run: |
+          if [ "$COVERAGE" = "true" ]; then
+            ./gradlew ":$APP_MODULE:testDebugUnitTest" ":$APP_MODULE:createDebugUnitTestCoverageReport" -Pcoverage --no-daemon --stacktrace
+          else
+            ./gradlew ":$APP_MODULE:testDebugUnitTest" --no-daemon --stacktrace
+          fi
+
+      # The build that ships: R8 and resource shrinking catch missing keep rules here, not on a
+      # phone. Unsigned (no secrets on pull requests), so nothing to install.
+      - name: Assemble release (R8)
+        run: ./gradlew ":$APP_MODULE:assembleRelease" --no-daemon --stacktrace
+
+      # Checks the merged manifest that actually gets packaged in the release APK, so a dependency
+      # bringing a forbidden permission back fails CI instead of going unnoticed.
+      - name: Check forbidden permissions
+        if: env.FORBIDDEN_PERMISSIONS != ''
+        run: |
+          MANIFEST=$(find "$APP_MODULE/build/intermediates/packaged_manifests/release" -name AndroidManifest.xml | head -1)
+          if [ -z "$MANIFEST" ]; then
+            echo "Packaged release manifest not found" >&2
+            exit 1
+          fi
+          FOUND=0
+          for permission in $FORBIDDEN_PERMISSIONS; do
+            if grep -q "\"$permission\"" "$MANIFEST"; then
+              echo "$permission found in $MANIFEST" >&2
+              FOUND=1
+            fi
+          done
+          [ "$FOUND" -eq 0 ] || exit 1
+          echo "OK: none of [$FORBIDDEN_PERMISSIONS] in $MANIFEST"
+
+      - name: Upload lint report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lint-report
+          path: ${{ env.APP_MODULE }}/build/reports/lint-results-debug.html
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload unit test report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: unit-test-report
+          path: ${{ env.APP_MODULE }}/build/reports/tests/testDebugUnitTest/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Upload coverage report
+        if: always() && env.COVERAGE == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: ${{ env.APP_MODULE }}/build/reports/coverage/test/debug/
+          if-no-files-found: ignore
+          retention-days: 14

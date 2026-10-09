@@ -1,0 +1,47 @@
+# Checks the kit itself: workflows (actionlint), skills' and agents' frontmatter, JSON and YAML.
+name: Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: actionlint
+        run: |
+          bash <(curl -fsSL https://raw.githubusercontent.com/rhysd/actionlint/v1.7.7/scripts/download-actionlint.bash) 1.7.7
+          ./actionlint .github/workflows/*.yml template/.github/workflows/*.yml
+
+      - name: Frontmatter, JSON, YAML
+        run: |
+          python3 - <<'PY'
+          import glob, json, sys, yaml
+          bad = 0
+          for f in glob.glob('template/.claude/**/*.md', recursive=True) + glob.glob('skill/**/SKILL.md', recursive=True):
+              parts = open(f).read().split('---')
+              try:
+                  d = yaml.safe_load(parts[1])
+                  assert d.get('name') and d.get('description'), 'name/description missing'
+              except Exception as e:
+                  print(f'{f}: {e}'); bad += 1
+          for f in glob.glob('template/**/*.json', recursive=True):
+              try: json.load(open(f))
+              except Exception as e: print(f'{f}: {e}'); bad += 1
+          for f in glob.glob('**/*.yml', recursive=True) + glob.glob('.github/**/*.yml', recursive=True) + glob.glob('template/.github/**/*.yml', recursive=True):
+              try: yaml.safe_load(open(f))
+              except Exception as e: print(f'{f}: {e}'); bad += 1
+          sys.exit(1 if bad else 0)
+          PY
+
+      - name: Hook script syntax
+        run: bash -n template/.claude/hooks/android-sdk.sh

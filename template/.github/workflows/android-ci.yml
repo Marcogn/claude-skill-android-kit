@@ -1,0 +1,25 @@
+# Android CI: lint, unit tests, release build (R8), forbidden-permissions check. The logic lives in
+# the kit (https://github.com/Marcogn/claude-skill-android-kit); here only this project's values.
+name: Android CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    uses: Marcogn/claude-skill-android-kit/.github/workflows/android-ci.yml@v1
+    with:
+      app-module: app
+      java-version: '17'
+      # Permissions the packaged release manifest must not declare (space separated, may be empty).
+      forbidden-permissions: ''
+      coverage: true
+    # If the build needs extra environment variables from secrets, pass them as KEY=VALUE lines:
+    # secrets:
+    #   BUILD_ENV: "API_CLIENT_ID=${{ secrets.API_CLIENT_ID }}"

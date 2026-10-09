@@ -1,0 +1,30 @@
+# Release (manual, with the version): cuts CHANGELOG.md's [Unreleased] section, bumps the version,
+# builds and signs, publishes the GitHub Release, then commits the bump to main. Logic in the kit
+# (its docs/ci.md explains every step); here only this project's values.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release, e.g. 0.1.0 (must be greater than the current versionName in the app module build.gradle.kts)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    uses: Marcogn/claude-skill-android-kit/.github/workflows/release.yml@v1
+    with:
+      version: ${{ inputs.version }}
+      app-module: app
+      java-version: '17'
+    secrets:
+      RELEASE_KEYSTORE_BASE64: ${{ secrets.RELEASE_KEYSTORE_BASE64 }}
+      RELEASE_KEYSTORE_PASSWORD: ${{ secrets.RELEASE_KEYSTORE_PASSWORD }}
+      RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+      RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
+      RELEASE_PUSH_TOKEN: ${{ secrets.RELEASE_PUSH_TOKEN }}
+      # Extra build environment, if needed: BUILD_ENV: "API_CLIENT_ID=${{ secrets.API_CLIENT_ID }}"
