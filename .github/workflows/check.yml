@@ -44,4 +44,4 @@ jobs:
           PY
 
       - name: Hook script syntax
-        run: bash -n template/.claude/hooks/android-sdk.sh
+        run: for f in template/.claude/hooks/*.sh; do bash -n "$f"; done
