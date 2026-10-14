@@ -36,11 +36,12 @@ Two more files feed reviews: `REVIEW.md` (read by Claude Code Review on GitHub a
 | `.claude/skills/next-phase` | The CLAUDE.md session protocol as steps: model check, reading order, prerequisites, open bugs, scope | Yes, for projects with a phase plan |
 | `.claude/skills/self-review` | The review: `verify`, then `/code-review` and the `architecture-reviewer` agent on the diff in parallel, fix what is real, record it for the gate. Run by `close-phase`, or on its own by any session that changed code | Yes |
 | `.claude/skills/close-phase` | "Done when", `self-review`, docs, commit, draft PR, device checks | Yes |
+| `.claude/skills/deps-triage` | Verdict on each open Dependabot PR (safe / to look at / close) with the reason, from CI, update type and release notes. Never approves or merges | Yes |
 | `.claude/skills/steward` | How to read this CI's failures and handle review findings. Cloud sessions that watch a PR read it before acting on CI or review events | Yes |
 | `.claude/agents/architecture-reviewer.md` | Read-only reviewer of a diff against REVIEW.md, CLAUDE.md rules and ADRs. Always runs on Opus, whatever the session's model: a stricter second look at the end of a phase, for a little more usage | Yes (rules come from the repo) |
 | `REVIEW.md` | What a review must always check here, severity, what to skip | **No**: per project |
 | `.github/workflows/*.yml` | Short callers of the kit's reusable workflows: CI, Build APK, Release, cleanup, `@claude`, PR review (`docs/ci.md`) | Yes (`with:` values per project) |
-| `.github/dependabot.yml` | Weekly grouped dependency PRs (Gradle) and monthly (Actions) | Yes |
+| `.github/dependabot.yml` | Weekly grouped dependency PRs (Gradle) and monthly (Actions), with a cooldown so brand-new versions wait a few days (security updates don't) | Yes |
 | `.github/pull_request_template.md`, `ISSUE_TEMPLATE/` | Same structure for every PR; issues written so they can be handed to Claude as they are | Yes |
 | `docs/claude.md`, `docs/ci.md` | This page and the CI page | Yes |
 | `.claude/kit-version` | The kit version the project was last aligned with | Written by the skill |
@@ -157,6 +158,11 @@ this, the only automatic review was `claude-review.yml`, and it skips draft PRs,
 cloud sessions open: so it never ran unless the PR was marked ready.)
 
 Any time: `@claude` on an issue or PR for small things (needs the token), or open an issue for a bug.
+
+**Dependency PRs**: when some have piled up, a session on the repo and `/deps-triage`: a verdict for
+each (safe / to look at / close) with the reason. Merge the safe ones, ask the session to take a "to
+look at" one to green if you want it. A scheduled routine could do the same weekly, but it spends the
+subscription also in weeks with nothing to see: add it only if running the skill by hand isn't enough.
 
 ## Habits that pay off
 

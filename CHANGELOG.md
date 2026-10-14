@@ -17,6 +17,11 @@
   major) computed from the current `versionName`; `version` becomes optional and overrides it.
   The reusable workflow's `version` input is no longer required (old callers keep working).
 
+- **Dependabot: cooldown and `/deps-triage`.** Gradle updates are proposed only after a version has
+  been out 3 days (patch), 7 (minor) or 14 (major), Actions after 7; security updates are not
+  delayed. New skill `deps-triage`: a verdict on each open Dependabot PR (safe / to look at /
+  close) with the reason; it never approves or merges.
+
 - **Names.** Hook `branch-name.sh` refuses vague names for branches Claude creates
   (`<type>/<what-and-where>`); `next-phase` and `new-plan` name the session with `set_session_title`;
   INSTALL adds the rule to a project's `CLAUDE.md`. `docs/claude.md` "Names".
