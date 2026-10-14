@@ -30,9 +30,10 @@ and `.claude/settings.json` (below).
   change made in the project): don't overwrite silently. Show the diff and ask (AskUserQuestion:
   keep the project's, take the kit's, merge). A local improvement that would help every project
   belongs in the kit: offer to open an issue in the kit repository for it.
-- `.claude/settings.json`: if absent, copy it. If present, merge: the kit's `SessionStart` hook and
+- `.claude/settings.json`: if absent, copy it. If present, merge: the kit's hooks (`SessionStart`,
+  `Stop`, `PreToolUse`: add to a project's own hooks of the same event, never replace them) and
   permission rules, plus every other key the project has.
-- Keep `.claude/hooks/android-sdk.sh` executable. Add `.claude/settings.local.json` to `.gitignore`.
+- Keep the scripts in `.claude/hooks/` executable. Add `.claude/settings.local.json` to `.gitignore`.
 - Old copies of the kit's own launcher or of an earlier kit skill inside the project (e.g.
   `tools/claude-kit/`) are removed.
 
@@ -68,6 +69,9 @@ Before replacing, compare each old workflow with the kit's reusable one
   workflow in the project, or bring it into the kit (an issue in the kit repository).
 - Other workflows of the project that aren't the kit's: leave them.
 
+The Release caller takes `bump` (choice) and `version` (optional) and its `permissions:` include
+`actions: write`; an old caller that only has `version` as a required input is replaced, not merged.
+
 The release relies on the app module having `versionCode = N` and `versionName = "x.y.z"` as plain
 literals, the signing block of `template/docs/ci.md`, and `CHANGELOG.md` with a `## [Unreleased]`
 section. Check all three; if one is missing, add it (the signing block exactly as in `docs/ci.md`)
@@ -101,6 +105,11 @@ and keep `coverage: true` in the Android CI caller.
     `docs/ci.md`);
   - commands: the coverage command;
   - manual Android SDK steps for cloud sessions: replace with a pointer to the hook;
+  - a rule on names, in the project's language: name the session at the start with
+    `set_session_title` (`<project> <what>`) and give branches Claude creates a `<type>/<what-and-where>`
+    name (`docs/claude.md`, "Names");
+  - a session protocol that says the review happens only at `/close-phase` or on request: align it
+    (the review runs before any PR, `self-review`, enforced by `.claude/hooks/review-gate.sh`);
   - a session protocol that sends out-of-scope findings to CLAUDE.md notes: align it (bugs and ideas
     become GitHub issues, `docs/claude.md`, "Issues");
   - a version of the app written in prose (e.g. "App alla 1.1.2") that differs from the build's

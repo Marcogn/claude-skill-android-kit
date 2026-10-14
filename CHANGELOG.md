@@ -2,6 +2,25 @@
 
 ## [Unreleased]
 
+- **Review before the PR, enforced.** New skill `self-review` (verify, `/code-review` and the
+  `architecture-reviewer` agent in parallel, fixes, record) and hook `review-gate.sh`: a session
+  that committed code can't end, and `create_pull_request` is denied, until the diff is reviewed;
+  a later change makes the review stale. Docs-only diffs are exempt. `close-phase` now runs
+  `self-review` as its step 3. Reason: `claude-review.yml` skips draft PRs, which cloud sessions
+  open, so in projects where `/close-phase` wasn't run nothing was ever reviewed.
+
+- **Release cleans the Actions history first.** Before anything else it deletes the completed runs
+  of every workflow except Release and the latest successful Build APK (needs `actions: write` in
+  the caller; without it, it warns and releases anyway).
+
+- **Release version from a choice.** The dispatch form offers `bump` (minor by default, patch,
+  major) computed from the current `versionName`; `version` becomes optional and overrides it.
+  The reusable workflow's `version` input is no longer required (old callers keep working).
+
+- **Names.** Hook `branch-name.sh` refuses vague names for branches Claude creates
+  (`<type>/<what-and-where>`); `next-phase` and `new-plan` name the session with `set_session_title`;
+  INSTALL adds the rule to a project's `CLAUDE.md`. `docs/claude.md` "Names".
+
 - **`architecture-reviewer` runs on Opus.** `model: opus` instead of `inherit`: phases done with
   Sonnet get a stricter review at `/close-phase`, at the cost of some extra usage.
 

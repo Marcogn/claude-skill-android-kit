@@ -10,13 +10,16 @@
 # re-run once the underlying problem is fixed — nothing is "spent" on a
 # failed attempt (an earlier commit-before-build order failed for real in
 # one of the projects).
-# The version input is always typed by hand (no auto-computed default —
-# GitHub's dispatch form can't pre-fill a value computed from repo state)
-# and is only validated to be greater than the current versionName. The
-# workflow still refuses to overwrite an existing release/tag. The GitHub
-# Release body is never the full cut section — see "Extract changelog
-# highlights" below for what actually gets published, and the kit's docs/ci.md
-# for the CHANGELOG entry convention it depends on.
+# The version is either typed (`version`, x.y.z) or computed from the current versionName by
+# `bump` (minor by default: 1.4.2 -> 1.5.0). GitHub's dispatch form can't pre-fill a value computed
+# from repo state, so the form offers the bump and the run prints the number it chose. Either way it
+# must be greater than the current versionName. The workflow still refuses to overwrite an existing
+# release/tag. The GitHub Release body is never the full cut section - see "Extract changelog
+# highlights" below for what actually gets published, and the kit's docs/ci.md for the CHANGELOG
+# entry convention it depends on.
+#
+# First thing it does: delete the completed runs of every workflow except Release and Build APK
+# (of which the latest successful one is kept). See "Clean up old runs".
 #
 # Reusable workflow, called by each project's .github/workflows/release.yml with the version typed
 # in the dispatch form. The release title and the APK name come from the calling repository's name.
@@ -26,9 +29,15 @@ on:
   workflow_call:
     inputs:
       version:
-        description: 'Version to release, e.g. 0.1.0 (must be greater than the current versionName in the app module build.gradle.kts)'
-        required: true
+        description: 'Exact version x.y.z (overrides bump; must be greater than the current versionName). Empty: computed from bump'
+        required: false
         type: string
+        default: ''
+      bump:
+        description: 'Which part of the current versionName to increase when version is empty: minor (1.4.2 -> 1.5.0), patch (1.4.3), major (2.0.0)'
+        required: false
+        type: string
+        default: minor
       app-module:
         description: Gradle module of the application
         type: string
@@ -52,8 +61,9 @@ on:
         description: Optional KEY=VALUE lines exported to the build environment
         required: false
 
-permissions:
-  contents: write
+# No `permissions:` here on purpose: the token gets what the caller grants. The caller gives
+# `contents: write` (version bump, release) and `actions: write` (clean up old runs); a caller that
+# lacks the second still releases, only the cleanup step warns and skips.
 
 # Two releases at once would race on the version bump pushed to main.
 concurrency:
@@ -71,6 +81,38 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
+      # Keeps the Actions history small: every completed run goes except those of Release (the
+      # record of what was released) and the latest successful Build APK (its APK and mapping.txt
+      # are what is on the phone). Matched by workflow file name, as the callers name them. Never
+      # blocks the release: if it can't delete (no `actions: write`), it warns and moves on.
+      - name: Clean up old runs
+        continue-on-error: true
+        env:
+          KEEP_ALL: release.yml
+          KEEP_LATEST_SUCCESS: build-apk.yml
+        run: |
+          deleted=0
+          while read -r wf_id wf_path; do
+            wf_file=$(basename "$wf_path")
+            [ "$wf_file" = "$KEEP_ALL" ] && continue
+            kept=0
+            # newest first; in-progress runs (this one) are not "completed", so they are never listed
+            while read -r run_id conclusion; do
+              if [ "$wf_file" = "$KEEP_LATEST_SUCCESS" ] && [ "$conclusion" = success ] && [ "$kept" = 0 ]; then
+                kept=1
+                continue
+              fi
+              if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >/dev/null 2>&1; then
+                deleted=$((deleted + 1))
+              else
+                echo "::warning::Could not delete run ${run_id} of ${wf_file} (does the caller grant actions: write?)"
+              fi
+            done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/${wf_id}/runs?status=completed&per_page=100" \
+                       --jq '.workflow_runs[] | "\(.id) \(.conclusion)"')
+          done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[] | "\(.id) \(.path)"')
+          echo "Deleted ${deleted} old runs."
+          echo "Deleted ${deleted} old workflow runs (Release runs and the latest successful Build APK kept)." >> "$GITHUB_STEP_SUMMARY"
+
       # Before anything else: without the secrets the errors come late and are obscure.
       - name: Check secrets
         env:
@@ -114,22 +156,19 @@ jobs:
       - name: Make gradlew executable
         run: chmod +x ./gradlew
 
-      # Validates the typed-in version input, then cuts CHANGELOG.md's [Unreleased] section
-      # into a dated "## [x.y.z]" one (leaving a fresh empty [Unreleased] above it) and bumps
-      # the app module's versionName/versionCode (+1) to match — the same two edits a
-      # human previously made by hand before running this workflow. Fails the whole run before touching any file if the input isn't a plain
-      # x.y.z, isn't greater than the current versionName, or the changelog has nothing new to
-      # release, since a bad input at this point would otherwise commit garbage to main.
+      # Works out the version (typed, or the current one bumped), validates it, then cuts
+      # CHANGELOG.md's [Unreleased] section into a dated "## [x.y.z]" one (leaving a fresh empty
+      # [Unreleased] above it) and bumps the app module's versionName/versionCode (+1) to match -
+      # the same two edits a human previously made by hand before running this workflow. Fails the
+      # whole run before touching any file if the version isn't a plain x.y.z, isn't greater than the
+      # current versionName, or the changelog has nothing new to release, since a bad input at this
+      # point would otherwise commit garbage to main.
       - name: Validate and apply version bump
         env:
-          NEW_VERSION: ${{ inputs.version }}
+          INPUT_VERSION: ${{ inputs.version }}
+          BUMP: ${{ inputs.bump }}
           BUILD_FILE: ${{ env.APP_MODULE }}/build.gradle.kts
         run: |
-          if [[ ! "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-            echo "version input must look like x.y.z (got: '$NEW_VERSION')" >&2
-            exit 1
-          fi
-
           CURRENT_VERSION=$(grep -m1 'versionName = ' "$BUILD_FILE" | sed -E 's/.*versionName = "([^"]*)".*/\1/')
           CURRENT_CODE=$(grep -m1 'versionCode = ' "$BUILD_FILE" | sed -E 's/.*versionCode = ([0-9]+).*/\1/')
           if [ -z "$CURRENT_VERSION" ] || [ -z "$CURRENT_CODE" ]; then
@@ -137,9 +176,32 @@ jobs:
             exit 1
           fi
 
+          if [ -n "$INPUT_VERSION" ]; then
+            NEW_VERSION="$INPUT_VERSION"
+          else
+            if [[ ! "$CURRENT_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+              echo "Cannot bump '$CURRENT_VERSION' automatically (not x.y.z): type the version." >&2
+              exit 1
+            fi
+            MAJOR=${BASH_REMATCH[1]}; MINOR=${BASH_REMATCH[2]}; PATCH=${BASH_REMATCH[3]}
+            case "$BUMP" in
+              major) NEW_VERSION="$((MAJOR + 1)).0.0" ;;
+              minor) NEW_VERSION="${MAJOR}.$((MINOR + 1)).0" ;;
+              patch) NEW_VERSION="${MAJOR}.${MINOR}.$((PATCH + 1))" ;;
+              *) echo "bump must be major, minor or patch (got: '$BUMP')" >&2; exit 1 ;;
+            esac
+          fi
+          echo "Releasing $NEW_VERSION (current: $CURRENT_VERSION)"
+          echo "Releasing **$NEW_VERSION** (current: $CURRENT_VERSION)" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ ! "$NEW_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "version must look like x.y.z (got: '$NEW_VERSION')" >&2
+            exit 1
+          fi
+
           HIGHEST=$(printf '%s\n%s\n' "$CURRENT_VERSION" "$NEW_VERSION" | sort -V | tail -1)
           if [ "$NEW_VERSION" = "$CURRENT_VERSION" ] || [ "$HIGHEST" != "$NEW_VERSION" ]; then
-            echo "version input ($NEW_VERSION) must be greater than the current versionName ($CURRENT_VERSION)" >&2
+            echo "version ($NEW_VERSION) must be greater than the current versionName ($CURRENT_VERSION)" >&2
             exit 1
           fi
 
@@ -347,7 +409,7 @@ jobs:
       # and can bypass main's branch protection.
       - name: Commit and push version bump
         env:
-          NEW_VERSION: ${{ inputs.version }}
+          NEW_VERSION: ${{ steps.version.outputs.name }}
           BUILD_FILE: ${{ env.APP_MODULE }}/build.gradle.kts
         run: |
           git config user.name "github-actions[bot]"
