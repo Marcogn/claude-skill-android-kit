@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- **`branch-name.sh`, second round.** Commands are split with POSIX awk instead of GNU-only `sed`
+  (`\n` in a replacement), so it works with macOS awk/sed too; quoted text spanning several lines
+  and heredoc bodies (commit messages) are skipped; `--create=name`, `-cname`, `-bname` are
+  checked; a quoted single-word name (`-b "wip"`) is still checked. Found by the review in
+  ThePatientGamerHelper.
+
 - **Fixes from the first round of updates.** `branch-name.sh` lets the cloud's `ccr-…` branches
   through, looks only at real commands (no more denials for `git branch | head` or a commit message
   that mentions `git branch`), also checks `switch --create`, `checkout --orphan` and `worktree add
