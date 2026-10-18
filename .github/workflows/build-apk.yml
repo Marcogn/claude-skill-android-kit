@@ -114,7 +114,7 @@ jobs:
           # verify fails the step on an unsigned or broken APK; the output format varies with the
           # signature schemes in use ("Signer #1", "V2 Signer"), so the print is best effort.
           "$APKSIGNER" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
-          grep -E "certificate (DN|SHA-256 digest)" "$RUNNER_TEMP/certs.txt" || cat "$RUNNER_TEMP/certs.txt"
+          grep -E "certificate (DN|SHA-256 digest|SHA-1 digest)" "$RUNNER_TEMP/certs.txt" || cat "$RUNNER_TEMP/certs.txt"
           SHORT_SHA=$(git rev-parse --short HEAD)
           echo "name=${{ github.event.repository.name }}-${GITHUB_REF_NAME//\//-}-$SHORT_SHA" >> "$GITHUB_OUTPUT"
           echo "path=$APK" >> "$GITHUB_OUTPUT"

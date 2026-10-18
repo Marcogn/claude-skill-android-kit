@@ -6,7 +6,7 @@ and the GitHub workflows they all run. One source, every project aligned.
 | Part | Path here | In a project |
 |---|---|---|
 | Reusable workflows: Android CI, Build APK, Release, cleanup, `@claude`, PR review | `.github/workflows/` | short callers in `.github/workflows/`, pinned at `@v1` |
-| Claude Code kit: skills (`new-plan`, `verify`, `next-phase`, `self-review`, `close-phase`, `steward`, `deps-triage`), `architecture-reviewer` agent, hooks (Android SDK, review gate, branch names), settings | `template/.claude/` | copied to `.claude/` |
+| Claude Code kit: skills (`new-plan`, `verify`, `next-phase`, `self-review`, `close-phase`, `steward`, `deps-triage`, `issues-triage`), `architecture-reviewer` agent, hooks (Android SDK, review gate, branch names), settings | `template/.claude/` | copied to `.claude/` |
 | Dependabot, PR template, issue templates | `template/.github/` | copied |
 | Docs: how and why (`claude.md`), workflows and secrets (`ci.md`) | `template/docs/` | copied to `docs/` |
 | The `android-kit` skill (launcher for claude.ai) | `skill/android-kit/` | uploaded once to the author's claude.ai account |
@@ -30,7 +30,7 @@ order (the exact procedure is [`INSTALL.md`](INSTALL.md)):
 1. **Reads the project**: `CLAUDE.md`, plans, decisions, workflows, build script, docs language. On a
    project that already has the kit, says what changed in the kit since its version.
 2. **Copies the generic files** from `template/`: the skills `new-plan`, `verify`, `next-phase`,
-   `self-review`, `close-phase`, `steward`, `deps-triage`, the `architecture-reviewer` agent, the hooks (Android SDK,
+   `self-review`, `close-phase`, `steward`, `deps-triage`, `issues-triage`, the `architecture-reviewer` agent, the hooks (Android SDK,
    review gate, branch names) and `.claude/settings.json`
    (merged with the project's own), Dependabot, PR and issue templates, `docs/claude.md`, `docs/ci.md`.
    If the project changed one of these files itself, it shows the difference and **asks**.
