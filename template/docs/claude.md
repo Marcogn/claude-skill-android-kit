@@ -37,6 +37,7 @@ Two more files feed reviews: `REVIEW.md` (read by Claude Code Review on GitHub a
 | `.claude/skills/self-review` | The review: `verify`, then `/code-review` and the `architecture-reviewer` agent on the diff in parallel, fix what is real, record it for the gate. Run by `close-phase`, or on its own by any session that changed code | Yes |
 | `.claude/skills/close-phase` | "Done when", `self-review`, docs, commit, draft PR, device checks | Yes |
 | `.claude/skills/deps-triage` | Verdict on each open Dependabot PR (safe / to look at / close) with the reason, from CI, update type and release notes. Never approves or merges | Yes |
+| `.claude/skills/issues-triage` | Reads the open issues and what they touch in the code, and proposes how to resolve them: grouped into sessions, each with its model (Sonnet or Opus) and the first message to start it. Changes no issue, writes no code | Yes |
 | `.claude/skills/steward` | How to read this CI's failures and handle review findings. Cloud sessions that watch a PR read it before acting on CI or review events | Yes |
 | `.claude/agents/architecture-reviewer.md` | Read-only reviewer of a diff against REVIEW.md, CLAUDE.md rules and ADRs. Always runs on Opus, whatever the session's model: a stricter second look at the end of a phase, for a little more usage | Yes (rules come from the repo) |
 | `REVIEW.md` | What a review must always check here, severity, what to skip | **No**: per project |
@@ -127,6 +128,8 @@ the plan:
   which open issues a new plan includes and assigns them to phases; `/next-phase` lists the open bugs
   and asks which to include; `/close-phase` writes `Fixes #n` in the PR, so merging closes them.
 - **Ideas and small tasks** outside the phases (template "Task"): "work on issue #n" in a session.
+- When several are open, `/issues-triage` says which are ready, which need information, which are
+  already planned or in a PR, and proposes the sessions to resolve the rest, with the model for each.
 - Things found during a phase and left out of scope: Claude proposes them as issues instead of
   notes in CLAUDE.md.
 
@@ -158,6 +161,11 @@ this, the only automatic review was `claude-review.yml`, and it skips draft PRs,
 cloud sessions open: so it never ran unless the PR was marked ready.)
 
 Any time: `@claude` on an issue or PR for small things (needs the token), or open an issue for a bug.
+
+**Open issues**: when some have piled up, a session on the repo (Sonnet is enough to triage) and
+`/issues-triage`: a table of the issues and their state, then the sessions to resolve them, in order,
+each with its model and the first message to type. Big ones are sent to `/new-plan`; nothing is
+changed on GitHub.
 
 **Dependency PRs**: when some have piled up, a session on the repo and `/deps-triage`: a verdict for
 each (safe / to look at / close) with the reason. Merge the safe ones, ask the session to take a "to

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+- **Skill `issues-triage`.** Reads the open issues (body, comments, linked PRs, whether a plan
+  already assigns them), finds what each touches in the code, and proposes a resolution plan in the
+  chat: size, state (ready, needs info, planned, in progress, duplicate, obsolete), sessions grouped
+  by area with the model for each (Sonnet, Opus, or an Opus + Sonnet split) and the first message
+  to start them. Issues too big for one PR go to `/new-plan`. Never comments, labels or closes.
+
 - **Review before the PR, enforced.** New skill `self-review` (verify, `/code-review` and the
   `architecture-reviewer` agent in parallel, fixes, record) and hook `review-gate.sh`: a session
   that committed code can't end, and `create_pull_request` is denied, until the diff is reviewed;
