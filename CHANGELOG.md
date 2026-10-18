@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- **Fixes from the first round of updates.** `branch-name.sh` lets the cloud's `ccr-…` branches
+  through, looks only at real commands (no more denials for `git branch | head` or a commit message
+  that mentions `git branch`), also checks `switch --create`, `checkout --orphan` and `worktree add
+  -b`, and builds its JSON with `jq` (#5). `self-review` falls back to `origin/main` when the clone
+  has no `origin/HEAD`, as the gate does. `next-phase` proposes out-of-scope findings as issues
+  instead of notes in CLAUDE.md, as `docs/claude.md` says. Build APK and Release also print the
+  certificate's SHA-1 (#3).
+
 - **Skill `issues-triage`.** Reads the open issues (body, comments, linked PRs, whether a plan
   already assigns them), finds what each touches in the code, and proposes a resolution plan in the
   chat: size, state (ready, needs info, planned, in progress, duplicate, obsolete), sessions grouped
@@ -15,9 +23,10 @@
   `self-review` as its step 3. Reason: `claude-review.yml` skips draft PRs, which cloud sessions
   open, so in projects where `/close-phase` wasn't run nothing was ever reviewed.
 
-- **Release cleans the Actions history first.** Before anything else it deletes the completed runs
-  of every workflow except Release and the latest successful Build APK (needs `actions: write` in
-  the caller; without it, it warns and releases anyway).
+- **Release cleans the Actions history.** As its last step, only after the release is published and
+  the bump pushed, it deletes the completed runs of every workflow except Release and the latest
+  successful Build APK (needs `actions: write` in the caller; without it, it warns). A failed release
+  deletes nothing, so its history is there to debug it.
 
 - **Release version from a choice.** The dispatch form offers `bump` (minor by default, patch,
   major) computed from the current `versionName`; `version` becomes optional and overrides it.

@@ -18,8 +18,8 @@
 # highlights" below for what actually gets published, and the kit's docs/ci.md for the CHANGELOG
 # entry convention it depends on.
 #
-# First thing it does: delete the completed runs of every workflow except Release and Build APK
-# (of which the latest successful one is kept). See "Clean up old runs".
+# Last thing it does, only after a successful release: delete the completed runs of every workflow
+# except Release and Build APK (of which the latest successful one is kept). See "Clean up old runs".
 #
 # Reusable workflow, called by each project's .github/workflows/release.yml with the version typed
 # in the dispatch form. The release title and the APK name come from the calling repository's name.
@@ -81,38 +81,6 @@ jobs:
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
-      # Keeps the Actions history small: every completed run goes except those of Release (the
-      # record of what was released) and the latest successful Build APK (its APK and mapping.txt
-      # are what is on the phone). Matched by workflow file name, as the callers name them. Never
-      # blocks the release: if it can't delete (no `actions: write`), it warns and moves on.
-      - name: Clean up old runs
-        continue-on-error: true
-        env:
-          KEEP_ALL: release.yml
-          KEEP_LATEST_SUCCESS: build-apk.yml
-        run: |
-          deleted=0
-          while read -r wf_id wf_path; do
-            wf_file=$(basename "$wf_path")
-            [ "$wf_file" = "$KEEP_ALL" ] && continue
-            kept=0
-            # newest first; in-progress runs (this one) are not "completed", so they are never listed
-            while read -r run_id conclusion; do
-              if [ "$wf_file" = "$KEEP_LATEST_SUCCESS" ] && [ "$conclusion" = success ] && [ "$kept" = 0 ]; then
-                kept=1
-                continue
-              fi
-              if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >/dev/null 2>&1; then
-                deleted=$((deleted + 1))
-              else
-                echo "::warning::Could not delete run ${run_id} of ${wf_file} (does the caller grant actions: write?)"
-              fi
-            done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/${wf_id}/runs?status=completed&per_page=100" \
-                       --jq '.workflow_runs[] | "\(.id) \(.conclusion)"')
-          done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[] | "\(.id) \(.path)"')
-          echo "Deleted ${deleted} old runs."
-          echo "Deleted ${deleted} old workflow runs (Release runs and the latest successful Build APK kept)." >> "$GITHUB_STEP_SUMMARY"
-
       # Before anything else: without the secrets the errors come late and are obscure.
       - name: Check secrets
         env:
@@ -291,7 +259,7 @@ jobs:
           # verify fails the step on an unsigned or broken APK; the output format varies with the
           # signature schemes in use ("Signer #1", "V2 Signer"), so the print is best effort.
           "$APKSIGNER" verify --print-certs "$APK" > "$RUNNER_TEMP/certs.txt"
-          grep -E "certificate (DN|SHA-256 digest)" "$RUNNER_TEMP/certs.txt" || cat "$RUNNER_TEMP/certs.txt"
+          grep -E "certificate (DN|SHA-256 digest|SHA-1 digest)" "$RUNNER_TEMP/certs.txt" || cat "$RUNNER_TEMP/certs.txt"
           ASSET_PATH="${APP_NAME}-${VERSION_NAME}.apk"
           cp "$APK" "$ASSET_PATH"
           ASSETS="$ASSET_PATH"
@@ -417,3 +385,36 @@ jobs:
           git add CHANGELOG.md "$BUILD_FILE"
           git commit -m "Cut release $NEW_VERSION"
           git push origin HEAD:main
+
+      # Last, and only once the release is out (a failed run keeps the history for debugging; the
+      # next successful one cleans up). Keeps the Actions history small: every completed run goes
+      # except those of Release (the record of what was released) and the latest successful Build
+      # APK (its APK and mapping.txt are what is on the phone). Matched by workflow file name, as the
+      # callers name them. Never fails the run: if it can't delete (no `actions: write`), it warns.
+      - name: Clean up old runs
+        continue-on-error: true
+        env:
+          KEEP_ALL: release.yml
+          KEEP_LATEST_SUCCESS: build-apk.yml
+        run: |
+          deleted=0
+          while read -r wf_id wf_path; do
+            wf_file=$(basename "$wf_path")
+            [ "$wf_file" = "$KEEP_ALL" ] && continue
+            kept=0
+            # newest first; in-progress runs (this one) are not "completed", so they are never listed
+            while read -r run_id conclusion; do
+              if [ "$wf_file" = "$KEEP_LATEST_SUCCESS" ] && [ "$conclusion" = success ] && [ "$kept" = 0 ]; then
+                kept=1
+                continue
+              fi
+              if gh api -X DELETE "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}" >/dev/null 2>&1; then
+                deleted=$((deleted + 1))
+              else
+                echo "::warning::Could not delete run ${run_id} of ${wf_file} (does the caller grant actions: write?)"
+              fi
+            done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows/${wf_id}/runs?status=completed&per_page=100" \
+                       --jq '.workflow_runs[] | "\(.id) \(.conclusion)"')
+          done < <(gh api --paginate "repos/${GITHUB_REPOSITORY}/actions/workflows" --jq '.workflows[] | "\(.id) \(.path)"')
+          echo "Deleted ${deleted} old runs."
+          echo "Deleted ${deleted} old workflow runs (Release runs and the latest successful Build APK kept)." >> "$GITHUB_STEP_SUMMARY"
