@@ -2,21 +2,13 @@
 
 ## [Unreleased]
 
-- **`branch-name.sh` denies only when sure.** When the command can't be read with certainty (an
-  unterminated quote or heredoc, unbalanced `(( ))`) or the name isn't a plain literal (`$VAR`,
-  `$( )`), it passes instead of guessing. It now also reads `$'...'` quotes, `(( ))` arithmetic
-  (its `<<` isn't a heredoc), redirections (`2>/dev/null`, `> "file"`, `<<<`), `#` comments, `--`,
-  `VAR=x`/`env`/`command` prefixes and git's global options (`--no-pager`, `--git-dir x`); the
-  last segment is no longer lost after an unterminated quote. `main`, `master`, `develop`,
-  `gh-pages` and `release/x.y.z` pass. The header states the contract: a wrongly denied normal
-  command is a bug, an unchecked one is accepted. Reviewed with `/code-review` three times; 78
-  cases tested.
-
-- **`branch-name.sh`, second round.** Commands are split with POSIX awk instead of GNU-only `sed`
-  (`\n` in a replacement), so it works with macOS awk/sed too; quoted text spanning several lines
-  and heredoc bodies (commit messages) are skipped; `--create=name`, `-cname`, `-bname` are
-  checked; a quoted single-word name (`-b "wip"`) is still checked. Found by the review in
-  ThePatientGamerHelper.
+- **`branch-name.sh`, simpler: denies only when sure.** It reads only plain commands (one line of
+  words joined by `;` `&&` `||` `|`); anything with quotes, `$`, backticks, parentheses,
+  redirections, heredocs, comments or several lines passes unchecked, so commit messages never
+  trip it. Pure bash, no `sed`/`awk` splitting (works on macOS). Also: `--create=name`, `--`,
+  `VAR=x git`, git global options; `main`, `master`, `develop`, `gh-pages`, `release/x.y.z` pass.
+  Replaces the awk shell lexer of the previous round, whose edge cases kept coming back in reviews
+  (ThePatientGamerHelper).
 
 - **Fixes from the first round of updates.** `branch-name.sh` lets the cloud's `ccr-…` branches
   through, looks only at real commands (no more denials for `git branch | head` or a commit message
