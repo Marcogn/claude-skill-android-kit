@@ -29,7 +29,7 @@ Two more files feed reviews: `REVIEW.md` (read by Claude Code Review on GitHub a
 |---|---|---|
 | `.claude/hooks/android-sdk.sh` | Installs the Android SDK (cmdline-tools, licences, platform-tools, the `compileSdk` platform), writes `local.properties`, caps Gradle workers, sets `LC_ALL`. Cloud only; idempotent (≈0.5 s when done) | Yes |
 | `.claude/hooks/review-gate.sh` | **Review before the PR.** At `Stop`, if the branch has committed code changes nobody reviewed, blocks the end of the session once and tells Claude to run `self-review`; before `create_pull_request`, denies the call until the review is recorded. Docs-only diffs are exempt | Yes |
-| `.claude/hooks/branch-name.sh` | Denies creating a branch whose name doesn't say what it is for (`<type>/<what-and-where>`, three words at least); `claude/…` names from the cloud environment pass | Yes |
+| `.claude/hooks/branch-name.sh` | Denies creating a branch whose name doesn't say what it is for (`<type>/<what-and-where>`, three words at least); `claude/…` and `ccr-…` names from the cloud environment pass | Yes |
 | `.claude/settings.json` | Runs the SDK script at `SessionStart`, the two gates above at `Stop` / `PreToolUse`; allows `./gradlew` and read-only git without prompts; denies reading keystores | Yes |
 | `.claude/skills/verify` | Lint + unit tests + debug build, what counts as transient, how to report. Claude Code (v2.1.286+) also runs a project skill named `verify` on its own before each commit that changes code | Yes |
 | `.claude/skills/new-plan` | Plans new work as phases in the project's format, after asking the decisive questions and considering the open issues; proposes it as a draft PR to adjust and merge. Writes no code | Yes |
@@ -110,7 +110,7 @@ Both are read later, in lists, notifications and PRs, so they say what the work 
 - **Branch**: `<type>/<what-and-where>`, lowercase with hyphens, three words at least:
   `fix/crash-on-rotation`, `feat/export-pdf-share`, `deps/gradle-minor-bumps`, `plan/offline-sync`,
   `phase/9-export-pdf`. Types: `feat`, `fix`, `refactor`, `docs`, `chore`, `deps`, `plan`, `phase`.
-  `branch-name.sh` refuses vaguer names for branches Claude creates. A `claude/…` branch is named by the
+  `branch-name.sh` refuses vaguer names for branches Claude creates. A `claude/…` or `ccr-…` branch is named by the
   cloud environment, not by Claude: the hook lets it pass and can't improve it.
 - **Cloud session**: `<project> <what>`, e.g. `PdfToolkit crash on rotation`, `KartLog 9 Export PDF`.
   Claude sets it at the start with the `set_session_title` tool (claude-code-remote) as soon as it
