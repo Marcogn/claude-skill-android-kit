@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+- **`branch-name.sh` denies only when sure.** When the command can't be read with certainty (an
+  unterminated quote or heredoc, unbalanced `(( ))`) or the name isn't a plain literal (`$VAR`,
+  `$( )`), it passes instead of guessing. It now also reads `$'...'` quotes, `(( ))` arithmetic
+  (its `<<` isn't a heredoc), redirections (`2>/dev/null`, `> "file"`, `<<<`), `#` comments, `--`,
+  `VAR=x`/`env`/`command` prefixes and git's global options (`--no-pager`, `--git-dir x`); the
+  last segment is no longer lost after an unterminated quote. `main`, `master`, `develop`,
+  `gh-pages` and `release/x.y.z` pass. The header states the contract: a wrongly denied normal
+  command is a bug, an unchecked one is accepted. Reviewed with `/code-review` three times; 78
+  cases tested.
+
 - **`branch-name.sh`, second round.** Commands are split with POSIX awk instead of GNU-only `sed`
   (`\n` in a replacement), so it works with macOS awk/sed too; quoted text spanning several lines
   and heredoc bodies (commit messages) are skipped; `--create=name`, `-cname`, `-bname` are
