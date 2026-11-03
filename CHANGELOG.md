@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+- **Release survives a merge during the build.** The bump is committed before the release and the
+  tag is pushed on that commit (`gh release create --verify-tag`), so the tag is always the source
+  of the APK; before, `gh release create` tagged main's head at that moment. If main moved, the
+  bump is rebased onto it and pushed again (up to three tries); a conflict stops the run with what
+  to commit by hand, and nothing wrong reaches main. Seen in HackDex-Tracker 1.5.1: release out,
+  push of the bump rejected (`fetch first`).
+
 - **`branch-name.sh`, simpler: denies only when sure.** It reads only plain commands (one line of
   words joined by `;` `&&` `||` `|`); anything with quotes, `$`, backticks, parentheses,
   redirections, heredocs, comments or several lines passes unchecked, so commit messages never

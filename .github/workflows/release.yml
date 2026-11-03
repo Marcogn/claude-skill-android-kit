@@ -357,25 +357,10 @@ jobs:
             } > release-notes.md
           fi
 
-      - name: Create GitHub release
-        env:
-          RELEASE_TAG: ${{ steps.version.outputs.tag }}
-          ASSETS: ${{ steps.apk.outputs.assets }}
-          APP_NAME: ${{ github.event.repository.name }}
-        run: |
-          # ASSETS is a space-separated list of file names without spaces: split on purpose.
-          # shellcheck disable=SC2086
-          gh release create "$RELEASE_TAG" \
-            $ASSETS \
-            --repo "$GITHUB_REPOSITORY" \
-            --title "$APP_NAME $RELEASE_TAG" \
-            --notes-file release-notes.md
-
-      # Only reached once the release above actually exists. Pushes with the credentials the
-      # initial Checkout step already configured for this job (its RELEASE_PUSH_TOKEN input) —
-      # a PAT, not the default GITHUB_TOKEN, so this commit authenticates as an actual repo admin
-      # and can bypass main's branch protection.
-      - name: Commit and push version bump
+      # The bump is committed here, before the release, so the tag can name the exact commit the APK
+      # was built from: the checked-out commit plus this bump. Nothing is pushed yet.
+      - name: Commit version bump
+        id: bump
         env:
           NEW_VERSION: ${{ steps.version.outputs.name }}
           BUILD_FILE: ${{ env.APP_MODULE }}/build.gradle.kts
@@ -384,7 +369,57 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add CHANGELOG.md "$BUILD_FILE"
           git commit -m "Cut release $NEW_VERSION"
-          git push origin HEAD:main
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # The tag is pushed first and the release made on it (--verify-tag), so the tag is the built
+      # commit even if main moved during the build: without it, `gh release create` tags whatever
+      # main's head is at that moment. If the release can't be made, the tag is removed again.
+      - name: Create GitHub release
+        env:
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+          BUILT_SHA: ${{ steps.bump.outputs.sha }}
+          ASSETS: ${{ steps.apk.outputs.assets }}
+          APP_NAME: ${{ github.event.repository.name }}
+        run: |
+          git push origin "$BUILT_SHA:refs/tags/$RELEASE_TAG"
+          # ASSETS is a space-separated list of file names without spaces: split on purpose.
+          # shellcheck disable=SC2086
+          if ! gh release create "$RELEASE_TAG" \
+              $ASSETS \
+              --repo "$GITHUB_REPOSITORY" \
+              --verify-tag \
+              --title "$APP_NAME $RELEASE_TAG" \
+              --notes-file release-notes.md; then
+            git push origin ":refs/tags/$RELEASE_TAG" || echo "::warning::Could not delete tag $RELEASE_TAG"
+            exit 1
+          fi
+
+      # Only reached once the release above actually exists. Pushes with the credentials the
+      # initial Checkout step already configured for this job (its RELEASE_PUSH_TOKEN input): a
+      # PAT, not the default GITHUB_TOKEN, so this commit authenticates as an actual repo admin
+      # and can bypass main's branch protection. A pull request merged during the build makes the
+      # push a non-fast-forward: the bump is then rebased onto the new main and pushed again (a few
+      # tries, in case main keeps moving). A conflict (the merged PR touched the version lines or
+      # the top of CHANGELOG.md) stops the run and says what to commit by hand.
+      - name: Commit and push version bump
+        env:
+          NEW_VERSION: ${{ steps.version.outputs.name }}
+          RELEASE_TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          for attempt in 1 2 3; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "main moved during the release (attempt $attempt): rebasing the bump onto it"
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort
+              echo "::error::Release $RELEASE_TAG is out, but its version bump conflicts with main. Commit it to main by hand: versionName $NEW_VERSION, versionCode +1, CHANGELOG.md's [Unreleased] entries under '## [$NEW_VERSION] - <date>' (tag $RELEASE_TAG holds the exact change)."
+              exit 1
+            fi
+          done
+          echo "::error::Release $RELEASE_TAG is out, but main kept moving and its version bump was not pushed. Commit it to main by hand (tag $RELEASE_TAG holds the exact change)."
+          exit 1
 
       # Last, and only once the release is out (a failed run keeps the history for debugging; the
       # next successful one cleans up). Keeps the Actions history small: every completed run goes
